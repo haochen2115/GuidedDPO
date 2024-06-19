@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 def convert_alpaca(examples: Dict[str, List[Any]], dataset_attr: "DatasetAttr") -> Dict[str, List[Any]]:
-    outputs = {"prompt": [], "response": [], "system": [], "tools": []}
+    outputs = {"prompt": [], "response": [], "hinted": [], "system": [], "tools": []}
     for i in range(len(examples[dataset_attr.prompt])):
         prompt = []
         if dataset_attr.history and isinstance(examples[dataset_attr.history][i], list):
@@ -40,8 +40,12 @@ def convert_alpaca(examples: Dict[str, List[Any]], dataset_attr: "DatasetAttr") 
         else:
             response = []
 
+        hinted_message = [
+            {"role": Role.ASSISTANT.value, "content": examples["hint_answer"][i]}
+        ]
         outputs["prompt"].append(prompt)
         outputs["response"].append(response)
+        outputs["hinted"].append(hinted_message)
         outputs["system"].append(examples[dataset_attr.system][i] if dataset_attr.system else "")
         outputs["tools"].append("")
 
@@ -49,6 +53,7 @@ def convert_alpaca(examples: Dict[str, List[Any]], dataset_attr: "DatasetAttr") 
 
 
 def convert_sharegpt(examples: Dict[str, List[Any]], dataset_attr: "DatasetAttr") -> Dict[str, List[Any]]:
+    # outputs = {"prompt": [], "response": [], "hinted": [], "system": [], "tools": []}
     outputs = {"prompt": [], "response": [], "system": [], "tools": []}
     tag_mapping = {
         dataset_attr.user_tag: Role.USER.value,
@@ -79,9 +84,13 @@ def convert_sharegpt(examples: Dict[str, List[Any]], dataset_attr: "DatasetAttr"
             aligned_messages.append(
                 {"role": tag_mapping[message[dataset_attr.role_tag]], "content": message[dataset_attr.content_tag]}
             )
-
+        
+        # hinted_messages = [
+        #     {"role": dataset_attr.assistant_tag, "content": examples["hinted"]}
+        # ]
         outputs["prompt"].append(aligned_messages[:-1])
         outputs["response"].append(aligned_messages[-1:])
+        # outputs["hinted"].append(hinted_messages)
         outputs["system"].append(system)
         outputs["tools"].append(examples[dataset_attr.tools][i] if dataset_attr.tools else "")
 
@@ -110,6 +119,9 @@ def align_dataset(
                 {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
             ],
             "response": [
+                {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
+            ],
+            "hinted": [
                 {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
             ],
             "system": {"dtype": "string", "_type": "Value"},

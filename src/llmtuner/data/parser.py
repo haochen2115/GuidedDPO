@@ -107,7 +107,7 @@ def get_dataset_list(data_args: "DataArguments") -> List["DatasetAttr"]:
         if "columns" in dataset_info[name]:
             column_names = ["system"]
             if dataset_attr.formatting == "alpaca":
-                column_names.extend(["prompt", "query", "response", "history"])
+                column_names.extend(["prompt", "query", "response", "hint_answer", "history"])
             else:
                 column_names.extend(["messages", "tools"])
 

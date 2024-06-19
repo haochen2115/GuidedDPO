@@ -35,7 +35,7 @@ class PairwiseDataCollatorWithPadding(DataCollatorForSeq2Seq):
         """
         concatenated_features = []
         label_positions = []
-        for key in ("chosen_ids", "rejected_ids"):
+        for key in ("chosen_ids", "rejected_ids", "hinted_ids" ):
             for feature in features:
                 prompt_len, answer_len = len(feature["prompt_ids"]), len(feature[key])
                 concatenated_features.append(

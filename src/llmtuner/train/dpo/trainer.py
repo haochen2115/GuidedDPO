@@ -114,10 +114,10 @@ class CustomDPOTrainer(DPOTrainer):
             is_encoder_decoder=self.is_encoder_decoder,
             label_pad_token_id=self.label_pad_token_id,
         )
-        batch_size = batch["input_ids"].size(0) // 2
-        chosen_logps, rejected_logps = all_logps.split(batch_size, dim=0)
-        chosen_logits, rejected_logits = all_logits.split(batch_size, dim=0)
-        return chosen_logps, rejected_logps, chosen_logits, rejected_logits
+        batch_size = batch["input_ids"].size(0) // 3
+        chosen_logps, rejected_logps, hinted_logps = all_logps.split(batch_size, dim=0)
+        chosen_logits, rejected_logits, hinted_logits = all_logits.split(batch_size, dim=0)
+        return chosen_logps, rejected_logps, hinted_logps, chosen_logits, rejected_logits, hinted_logits
 
     def get_batch_loss_metrics(
         self,
@@ -132,8 +132,10 @@ class CustomDPOTrainer(DPOTrainer):
         (
             policy_chosen_logps,
             policy_rejected_logps,
+            policy_hinted_logps,
             policy_chosen_logits,
             policy_rejected_logits,
+            policy_hinted_logits,
         ) = self.concatenated_forward(model, batch)
         with torch.no_grad():
             if self.ref_model is None:
@@ -149,6 +151,8 @@ class CustomDPOTrainer(DPOTrainer):
                     reference_rejected_logps,
                     _,
                     _,
+                    _,
+                    _,
                 ) = self.concatenated_forward(ref_model, batch)
 
         losses, chosen_rewards, rejected_rewards = self.dpo_loss(
@@ -158,9 +162,9 @@ class CustomDPOTrainer(DPOTrainer):
             reference_rejected_logps,
         )
         if self.ftx_gamma > 1e-6:
-            batch_size = batch["input_ids"].size(0) // 2
-            chosen_labels, _ = batch["labels"].split(batch_size, dim=0)
-            losses += self.ftx_gamma * self.sft_loss(policy_chosen_logits, chosen_labels)
+            batch_size = batch["input_ids"].size(0) // 3
+            chosen_labels, rejected_labels, hinted_labels = batch["labels"].split(batch_size, dim=0)
+            losses += self.ftx_gamma * self.sft_loss(policy_hinted_logits, hinted_labels)
 
         reward_accuracies = (chosen_rewards > rejected_rewards).float()
 
@@ -171,7 +175,9 @@ class CustomDPOTrainer(DPOTrainer):
         metrics["{}rewards/margins".format(prefix)] = (chosen_rewards - rejected_rewards).cpu().mean()
         metrics["{}logps/rejected".format(prefix)] = policy_rejected_logps.detach().cpu().mean()
         metrics["{}logps/chosen".format(prefix)] = policy_chosen_logps.detach().cpu().mean()
+        metrics["{}logps/hinted".format(prefix)] = policy_hinted_logps.detach().cpu().mean()
         metrics["{}logits/rejected".format(prefix)] = policy_rejected_logits.detach().cpu().mean()
         metrics["{}logits/chosen".format(prefix)] = policy_chosen_logits.detach().cpu().mean()
+        metrics["{}logits/hinted".format(prefix)] = policy_hinted_logits.detach().cpu().mean()
 
         return losses.mean(), metrics
